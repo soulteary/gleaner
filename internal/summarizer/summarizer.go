@@ -120,7 +120,7 @@ func (s *Summarizer) Summarize(content string, expectedLength float64, title str
 	for i := 0; i < len(copiedRank); i++ {
 		ordinal := copiedRank[i].idx
 		if s.isValidateSentence(sentences[ordinal]) {
-			summarySize += len(sentences[ordinal])
+			summarySize += len([]rune(strings.Join(sentences[ordinal], "")))
 			if len(selectIndex) > 0 {
 				if float64(summarySize) > expectedLength {
 					break
