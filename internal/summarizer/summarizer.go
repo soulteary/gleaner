@@ -201,16 +201,34 @@ func (s *Summarizer) isValidateSentence(charArr []string) bool {
 	return true
 }
 
-// buildSimilarityGraph matches node-summary.js: levenshtein on array.toString() (comma-joined).
+// buildSimilarityGraph produces a normalized similarity matrix for TextRank.
+// Levenshtein distance is computed on rune-level and converted to a similarity
+// weight (1 - dist/maxLen) so that "more similar" yields a larger value, matching
+// TextRank semantics. Self-loops (i==j) are set to 0 to avoid dominating the graph.
 func buildSimilarityGraph(sentences [][]string) [][]float64 {
 	n := len(sentences)
 	graph := make([][]float64, n)
+	joined := make([]string, n)
+	for i := 0; i < n; i++ {
+		joined[i] = strings.Join(sentences[i], ",")
+	}
 	for i := 0; i < n; i++ {
 		graph[i] = make([]float64, n)
-		si := strings.Join(sentences[i], ",")
+		li := len([]rune(joined[i]))
 		for j := 0; j < n; j++ {
-			sj := strings.Join(sentences[j], ",")
-			graph[i][j] = float64(textrank.Distance(si, sj))
+			if i == j {
+				continue
+			}
+			lj := len([]rune(joined[j]))
+			maxLen := li
+			if lj > maxLen {
+				maxLen = lj
+			}
+			if maxLen == 0 {
+				continue
+			}
+			dist := textrank.Distance(joined[i], joined[j])
+			graph[i][j] = 1 - float64(dist)/float64(maxLen)
 		}
 	}
 	return graph
