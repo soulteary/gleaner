@@ -175,6 +175,10 @@ func (s *Summarizer) splitToTerms(content string) [][][]string {
 	return terms
 }
 
+func isASCIIAlphaNumeric(r rune) bool {
+	return (r >= '0' && r <= '9') || (r >= 'A' && r <= 'Z') || (r >= 'a' && r <= 'z')
+}
+
 func (s *Summarizer) isValidateSentence(charArr []string) bool {
 	if len(charArr) == 0 {
 		return false
@@ -182,13 +186,21 @@ func (s *Summarizer) isValidateSentence(charArr []string) bool {
 	slen, dlen := 0, 0
 	text := strings.Join(charArr, "")
 	for _, r := range text {
-		if (r >= 0x0001 && r <= 0x007e) || (r >= 0xff60 && r <= 0xff9f) {
+		switch {
+		case unicode.IsSpace(r):
+			// 空白不计入任何一侧，避免噪声干扰判定
+		case isASCIIAlphaNumeric(r) || (r >= 0xff60 && r <= 0xff9f):
+			// 仅统计字母/数字类 ASCII（含半角片假名），排除标点噪声
 			slen++
-		} else if !unicode.IsSpace(r) {
+		case r >= 0x0001 && r <= 0x007e:
+			// 其余 ASCII（标点/符号）既不计中文也不计 ASCII 主体
+		default:
 			dlen++
 		}
 	}
-	if slen > dlen {
+	// 仅当句子里没有任何中文（dlen==0）且 ASCII 字母数字占主导时，才判为非中文句而丢弃；
+	// 含少量英文/数字（如公司名、型号）的中文句不再被误删。
+	if dlen == 0 && slen > 0 {
 		return false
 	}
 	if len(s.filter) > 0 {
