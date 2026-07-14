@@ -80,7 +80,12 @@ func stringsJoin(tokens []string) string {
 	return string(b)
 }
 
-// PageRank computes PageRank on a similarity graph (iterative, non-recursive).
+// PageRank computes weighted PageRank on a similarity graph (iterative,
+// non-recursive). Each node distributes its rank to neighbours in proportion to
+// the outgoing edge weight graph[a][b] (standard weighted TextRank). Treating the
+// graph as weighted—rather than as unweighted boolean edges—is what lets scores
+// differentiate on a dense similarity matrix; an unweighted variant degenerates
+// to a uniform distribution whenever every pair of sentences is connected.
 func PageRank(graph [][]float64, linkProb, tolerance float64) []float64 {
 	n := len(graph)
 	if n == 0 {
@@ -93,11 +98,21 @@ func PageRank(graph [][]float64, linkProb, tolerance float64) []float64 {
 		prob[i] = 1.0 / float64(n)
 	}
 
-	incoming := make([][]int, n)
-	for i := 0; i < n; i++ {
-		for j := 0; j < n; j++ {
-			if graph[i][j] > 0 {
-				incoming[j] = append(incoming[j], i)
+	// Precompute, for each source node a, the total weight of its outgoing edges,
+	// and the list of (target, weight) it points to. incoming[b] collects the
+	// sources a that link into b so we can aggregate contributions per target.
+	type edge struct {
+		src    int
+		weight float64
+	}
+	outWeight := make([]float64, n)
+	incoming := make([][]edge, n)
+	for a := 0; a < n; a++ {
+		for b := 0; b < n; b++ {
+			w := graph[a][b]
+			if w > 0 {
+				outWeight[a] += w
+				incoming[b] = append(incoming[b], edge{src: a, weight: w})
 			}
 		}
 	}
@@ -106,15 +121,9 @@ func PageRank(graph [][]float64, linkProb, tolerance float64) []float64 {
 		converged := 0
 		for b := 0; b < n; b++ {
 			sum := 0.0
-			for _, a := range incoming[b] {
-				outCount := 0
-				for _, w := range graph[a] {
-					if w > 0 {
-						outCount++
-					}
-				}
-				if outCount > 0 {
-					sum += prob[a] / float64(outCount)
+			for _, e := range incoming[b] {
+				if outWeight[e.src] > 0 {
+					sum += prob[e.src] * (e.weight / outWeight[e.src])
 				}
 			}
 			res := coeff + linkProb*sum

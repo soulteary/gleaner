@@ -121,8 +121,9 @@ func TestGoldenSummarizeRatioLength(t *testing.T) {
 	if summary == "" {
 		t.Fatal("empty ratio summary")
 	}
-	// min=150 max=300 from DefaultOptions
-	if n := utf8.RuneCountInString(summary); n < 100 || n > 350 {
+	// DefaultOptions: MinSummaryLen=150, MaxSummaryLen=350。修正后的选句循环按字符
+	// 累加长度并"先纳入再判断"，摘要会贴近期望长度而不再偏短，因此下限收紧到 120。
+	if n := utf8.RuneCountInString(summary); n < 120 || n > 350 {
 		t.Fatalf("ratio summary runes=%d", n)
 	}
 }

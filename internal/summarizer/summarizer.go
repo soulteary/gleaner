@@ -120,14 +120,12 @@ func (s *Summarizer) Summarize(content string, expectedLength float64, title str
 	for i := 0; i < len(copiedRank); i++ {
 		ordinal := copiedRank[i].idx
 		if s.isValidateSentence(sentences[ordinal]) {
+			// 先纳入当前句，再判断是否达到期望长度：这样最后一句会跨过阈值，
+			// 摘要长度贴近 expectedLength，而非在超限前提前 break 造成偏短。
+			selectIndex = append(selectIndex, ordinal)
 			summarySize += len([]rune(strings.Join(sentences[ordinal], "")))
-			if len(selectIndex) > 0 {
-				if float64(summarySize) > expectedLength {
-					break
-				}
-				selectIndex = append(selectIndex, ordinal)
-			} else {
-				selectIndex = append(selectIndex, ordinal)
+			if float64(summarySize) >= expectedLength {
+				break
 			}
 		}
 	}

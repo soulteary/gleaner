@@ -141,7 +141,7 @@ go test -bench=. -benchmem ./internal/extractor ./... -run=^$  # BenchmarkGetBlo
 
 | 项目 | 说明 |
 |------|------|
-| 摘要句序 | gojieba 与 nodejieba 分词差异导致 TextRank 排序可能不同 |
+| 摘要句序 | Go 版已改用标准 TextRank：以 rune 级 Levenshtein 归一化相似度（`1 - dist/maxLen`）构图，并用**加权 PageRank**（按边权 `graph[i][j]` 分摊）迭代收敛，使 TextRank 因子真正生效；Node 原版 brain.js `pagerank.js` 把距离值当作节点索引建边，行为不同，因此排序与摘要选句会有预期内的差异（叠加 gojieba/nodejieba 分词差异） |
 | 情感分数 | 可能相差数个分值 |
 | 用户词典 | gojieba 不加载 AFINN 单列词表 |
 | `GetArticleSync` | 不做比例长度换算；`Summarize` 支持 `0.04` |
