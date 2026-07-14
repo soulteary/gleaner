@@ -16,6 +16,9 @@ func TestLevenshtein(t *testing.T) {
 		{"kitten", "sitting", 3},
 		{"abc", "abc", 0},
 		{"abc", "ab", 1},
+		{"你好世界", "你好", 2},
+		{"你好", "你好世界", 2},
+		{"中文", "英文", 1},
 	}
 	for _, tc := range cases {
 		got := textrank.Distance(tc.a, tc.b)

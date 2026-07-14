@@ -1,28 +1,31 @@
 package textrank
 
-// Distance computes Levenshtein distance between two strings.
+// Distance computes Levenshtein distance between two strings, measured in
+// runes so multi-byte characters (e.g. CJK) count as a single unit.
 func Distance(s1, s2 string) int {
 	if s1 == s2 {
 		return 0
 	}
-	if len(s1) == 0 {
-		return len(s2)
+	r1 := []rune(s1)
+	r2 := []rune(s2)
+	if len(r1) == 0 {
+		return len(r2)
 	}
-	if len(s2) == 0 {
-		return len(s1)
+	if len(r2) == 0 {
+		return len(r1)
 	}
 
-	prevRow := make([]int, len(s2)+1)
+	prevRow := make([]int, len(r2)+1)
 	for i := range prevRow {
 		prevRow[i] = i
 	}
 
-	for i := 0; i < len(s1); i++ {
+	for i := 0; i < len(r1); i++ {
 		nextCol := i + 1
-		for j := 0; j < len(s2); j++ {
+		for j := 0; j < len(r2); j++ {
 			curCol := nextCol
 			cost := 1
-			if s1[i] == s2[j] {
+			if r1[i] == r2[j] {
 				cost = 0
 			}
 			nextCol = prevRow[j] + cost
@@ -34,9 +37,9 @@ func Distance(s1, s2 string) int {
 			}
 			prevRow[j] = curCol
 		}
-		prevRow[len(s2)] = nextCol
+		prevRow[len(r2)] = nextCol
 	}
-	return prevRow[len(s2)]
+	return prevRow[len(r2)]
 }
 
 // SimilarityGraph builds a similarity matrix using Levenshtein distance.
