@@ -1,0 +1,22 @@
+# syntax=docker/dockerfile:1
+
+# Pure-Go image using GSE segmenter (no CGO).
+FROM golang:1.26-alpine AS builder
+WORKDIR /src
+RUN apk add --no-cache git
+COPY go.mod go.sum ./
+RUN go mod download
+COPY . .
+ENV CGO_ENABLED=0
+ENV GLEANER_SEGMENT_BACKEND=gse
+RUN go build -o /out/gleaner-server ./cmd/gleaner-server
+
+FROM alpine:3.20
+RUN apk add --no-cache ca-certificates
+WORKDIR /app
+COPY --from=builder /out/gleaner-server /app/gleaner-server
+EXPOSE 3824
+ENV GLEANER_HOST=0.0.0.0
+ENV GLEANER_PORT=3824
+ENV GLEANER_SEGMENT_BACKEND=gse
+CMD ["/app/gleaner-server"]

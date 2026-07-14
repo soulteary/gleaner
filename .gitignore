@@ -1,0 +1,21 @@
+# Binaries
+/gleaner-server
+/bin/
+
+# Go
+*.exe
+*.test
+*.out
+vendor/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+
+# OS
+.DS_Store
+
+# Original Node.js source (reference)
+arex-master/node_modules/
+coverage.html

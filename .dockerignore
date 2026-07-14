@@ -1,0 +1,18 @@
+# Original Node.js reference (not used by Go build)
+arex-master/
+
+# Binaries
+/gleaner-server
+/gleaner
+/bin/
+*.exe
+*.test
+*.out
+
+# Git & IDE
+.git
+.gitignore
+.idea/
+.vscode/
+*.swp
+.DS_Store
