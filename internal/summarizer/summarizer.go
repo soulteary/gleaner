@@ -82,7 +82,7 @@ func (s *Summarizer) Summarize(content string, expectedLength float64, title str
 	}
 
 	graph := buildSimilarityGraph(sentences)
-	textRank := textrank.PageRankOriginal(graph, 0.85, 0.0001)
+	textRank := textrank.PageRank(graph, 0.85, 0.0001)
 
 	type ranked struct {
 		score float64
