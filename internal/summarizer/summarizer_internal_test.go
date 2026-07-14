@@ -67,6 +67,96 @@ func TestResolveExpectedLengthMaxCap(t *testing.T) {
 	}
 }
 
+// TestSimilarityGraphIgnoresStopwords 验证词汇重叠相似度会剔除停用词/标点：
+// 仅共享停用词的两句相似度应为 0，共享实词的两句应为正。
+func TestSimilarityGraphIgnoresStopwords(t *testing.T) {
+	sentences := [][]string{
+		{"人工", "智能", "的", "芯片", "。"},
+		{"天气", "的", "很好", "。"},
+		{"人工", "智能", "的", "算法", "。"},
+	}
+	g := buildSimilarityGraph(sentences)
+	// 句 0 与句 1 只共享停用词"的""。"，实词无重叠，相似度应为 0。
+	if g[0][1] != 0 {
+		t.Fatalf("stopword-only overlap should be 0, got %v", g[0][1])
+	}
+	// 句 0 与句 2 共享实词"人工""智能"，相似度应为正。
+	if g[0][2] <= 0 {
+		t.Fatalf("real-word overlap should be > 0, got %v", g[0][2])
+	}
+}
+
+// TestSummarizeDropsTitleRepeat 验证与标题几乎相同的复述句不会成为摘要首句。
+func TestSummarizeDropsTitleRepeat(t *testing.T) {
+	seg := testutil.NewSegmenter(t)
+	m := testutil.NewModel(t)
+	s := New(seg, m, false, nil)
+	title := "国产人工智能芯片实现算力突破"
+	content := "国产人工智能芯片实现算力突破。" +
+		"研究团队表示新架构在能效方面取得显著进展并降低了整体功耗。" +
+		"该芯片已进入量产阶段并计划在多家数据中心部署应用。" +
+		"业内分析认为这将推动大模型训练与推理生态的发展。"
+	out := s.Summarize(content, 120, title)
+	if out == "" {
+		t.Fatal("empty summary")
+	}
+	// 摘要不应以与标题高度重合的复述句开头。
+	first := strings.SplitN(out, "...", 2)[0]
+	if similarityToTitle := diceLike(title, first); similarityToTitle >= 0.8 {
+		t.Fatalf("summary starts with title restatement: %q", first)
+	}
+}
+
+// diceLike 是测试内联的 rune 级 bigram Dice，用于断言首句不复述标题，
+// 避免直接依赖 similarity 包的私有行为。
+func diceLike(a, b string) float64 {
+	ra, rb := []rune(a), []rune(b)
+	if a == b {
+		return 1
+	}
+	if len(ra) < 2 || len(rb) < 2 {
+		return 0
+	}
+	bg := map[string]int{}
+	for i := 0; i < len(ra)-1; i++ {
+		bg[string(ra[i:i+2])]++
+	}
+	inter := 0
+	for i := 0; i < len(rb)-1; i++ {
+		k := string(rb[i : i+2])
+		if bg[k] > 0 {
+			bg[k]--
+			inter++
+		}
+	}
+	return 2 * float64(inter) / float64(len(ra)+len(rb)-2)
+}
+
+// TestSummarizeMMRAvoidsRedundancy 验证 MMR 选句不会选入内容近乎重复的句子：
+// 构造两句几乎相同、另有若干不同主题句，摘要中不应同时包含那对重复句。
+func TestSummarizeMMRAvoidsRedundancy(t *testing.T) {
+	seg := testutil.NewSegmenter(t)
+	m := testutil.NewModel(t)
+	s := New(seg, m, false, nil)
+	// 两句几乎相同（仅末尾差异），其余为不同主题。
+	content := "人工智能芯片算力大幅提升带动产业升级。" +
+		"人工智能芯片算力大幅提升带动产业发展。" +
+		"新能源汽车销量持续增长市场前景广阔。" +
+		"生物医药研发投入加大创新成果不断涌现。" +
+		"航空航天技术取得重要进展探索深空。"
+	out := s.Summarize(content, 60, "")
+	parts := strings.Split(out, "...")
+	dupCount := 0
+	for _, p := range parts {
+		if strings.Contains(p, "人工智能芯片算力大幅提升带动产业") {
+			dupCount++
+		}
+	}
+	if dupCount > 1 {
+		t.Fatalf("MMR selected redundant near-duplicate sentences: %q", out)
+	}
+}
+
 // TestSimilarityGraphIsSimilarity 验证 buildSimilarityGraph 产出的是相似度（越相似值越大）
 // 而非距离：完全不同的句子相似度应低于内容相近的句子，且自环为 0。
 func TestSimilarityGraphIsSimilarity(t *testing.T) {
