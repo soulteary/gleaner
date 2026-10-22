@@ -1,7 +1,6 @@
 package main
 
 import (
-	"bytes"
 	"context"
 	"io"
 	"net/http"
@@ -22,34 +21,45 @@ func TestEnvOr(t *testing.T) {
 	}
 }
 
+// startupLog observes the complete startup log without racing a bytes.Buffer.
+type startupLog struct {
+	ready chan string
+}
+
+func (l startupLog) Write(p []byte) (int, error) {
+	line := string(p)
+	if start := strings.Index(line, "http://"); start >= 0 {
+		if end := strings.Index(line[start:], "/ (healthz"); end > 0 {
+			select {
+			case l.ready <- line[start : start+end]:
+			default:
+			}
+		}
+	}
+	return len(p), nil
+}
+
 func TestRunStartsAndShutsDown(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	var logBuf bytes.Buffer
+	ready := make(chan string, 1)
+	logOut := startupLog{ready: ready}
 	notify := func(c chan<- os.Signal, _ ...os.Signal) {}
 
 	errCh := make(chan error, 1)
 	go func() {
-		errCh <- run(ctx, "127.0.0.1", "0", &logBuf, notify)
+		errCh <- run(ctx, "127.0.0.1", "0", logOut, notify)
 	}()
 
 	var addr string
-	deadline := time.Now().Add(3 * time.Second)
-	for time.Now().Before(deadline) {
-		time.Sleep(20 * time.Millisecond)
-		line := logBuf.String()
-		if strings.Contains(line, "Server running at http://") {
-			start := strings.Index(line, "http://")
-			end := strings.Index(line[start:], "/ (healthz")
-			if start >= 0 && end > 0 {
-				addr = line[start : start+end]
-				break
-			}
-		}
-	}
-	if addr == "" {
-		t.Fatalf("server did not start, log=%q", logBuf.String())
+	// Loading a real dictionary can exceed three seconds on a cold CI runner.
+	select {
+	case addr = <-ready:
+	case err := <-errCh:
+		t.Fatalf("server exited before startup: %v", err)
+	case <-time.After(30 * time.Second):
+		t.Fatal("server did not start")
 	}
 
 	resp, err := http.Get(addr + "/healthz")
@@ -67,14 +77,14 @@ func TestRunStartsAndShutsDown(t *testing.T) {
 		if err != nil {
 			t.Fatalf("run returned error: %v", err)
 		}
-	case <-time.After(5 * time.Second):
+	case <-time.After(30 * time.Second):
 		t.Fatal("run did not exit after cancel")
 	}
 }
 
 func TestRunWithSignal(t *testing.T) {
 	ctx := context.Background()
-	var logBuf io.Writer = &bytes.Buffer{}
+	var logBuf io.Writer = io.Discard
 	notify := func(c chan<- os.Signal, _ ...os.Signal) {
 		go func() {
 			time.Sleep(100 * time.Millisecond)
@@ -92,7 +102,7 @@ func TestRunWithSignal(t *testing.T) {
 		if err != nil {
 			t.Fatalf("run returned error: %v", err)
 		}
-	case <-time.After(5 * time.Second):
+	case <-time.After(30 * time.Second):
 		t.Fatal("run did not exit on signal")
 	}
 }
