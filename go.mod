@@ -1,11 +1,11 @@
 module github.com/soulteary/gleaner
 
-go 1.26.4
+go 1.27.3
 
 require (
-	github.com/go-ego/gse v1.0.2
+	github.com/go-ego/gse v1.1.0
 	github.com/yanyiwu/gojieba v1.4.7
-	golang.org/x/text v0.38.0
+	golang.org/x/text v0.43.0
 )
 
-require github.com/vcaesar/cedar v0.30.0 // indirect
+require github.com/vcaesar/cedar v0.50.0 // indirect
